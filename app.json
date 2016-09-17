@@ -1,0 +1,8 @@
+{
+  "name": "LiveReload API Server",
+  "description": "",
+  "keywords": [
+  ],
+  "image": "heroku/go:1.6",
+  "mount_dir": "src/github.com/livereload/api.livereload.com"
+}
