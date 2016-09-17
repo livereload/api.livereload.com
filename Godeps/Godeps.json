@@ -1,0 +1,6 @@
+{
+	"ImportPath": "github.com/livereload/api.livereload.com",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v74",
+	"Deps": []
+}
