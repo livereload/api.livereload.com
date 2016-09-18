@@ -165,7 +165,7 @@ func showLicensingStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
+	sendErrorMessage(w, http.StatusNotFound, "Nothing to see here, move along.")
 }
 
 func main() {
@@ -191,9 +191,6 @@ func main() {
 		log.Fatal(err)
 	}
 	db.SetMaxOpenConns(4)
-
-	// age := 21
-	// rows, err := db.Query("SELECT name FROM users WHERE age = $1", age)
 
 	http.HandleFunc("/licensing/admin/import/", importLicenses)
 	http.HandleFunc("/licensing/admin/stats/", showLicensingStats)
