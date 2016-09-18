@@ -8,10 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/olekukonko/tablewriter"
 
 	"github.com/livereload/api.livereload.com/licensecode"
 	"github.com/livereload/api.livereload.com/model"
@@ -125,6 +127,43 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func showLicensingStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		sendErrorMessage(w, http.StatusMethodNotAllowed, "")
+		return
+	}
+
+	var cells [][]string
+	rows, err := db.Query("SELECT product_code, product_version, license_type, COUNT(*) FROM licenses WHERE NOT claimed GROUP BY product_code, product_version, license_type")
+	if err != nil {
+		sendError(w, err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var code, version, typ string
+		var count int
+		err = rows.Scan(&code, &version, &typ, &count)
+		if err != nil {
+			sendError(w, err)
+			return
+		}
+
+		prefix := fmt.Sprintf("%s%s%s", code, version, typ)
+
+		cells = append(cells, []string{prefix, strconv.Itoa(count)})
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	table := tablewriter.NewWriter(w)
+	table.SetHeader([]string{"License Type", "Count"})
+	table.SetCenterSeparator("-")
+	// table.SetBorder(false)
+	table.AppendBulk(cells)
+	table.Render()
+}
+
 func index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
 }
@@ -157,6 +196,7 @@ func main() {
 	// rows, err := db.Query("SELECT name FROM users WHERE age = $1", age)
 
 	http.HandleFunc("/licensing/admin/import/", importLicenses)
+	http.HandleFunc("/licensing/admin/stats/", showLicensingStats)
 	http.HandleFunc("/", index)
 	log.Printf("Listening on port %s.", port)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
