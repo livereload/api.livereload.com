@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -21,10 +22,12 @@ var db *sql.DB
 
 type outcome struct {
 	license *licensecode.License
-	added   bool
+	result  string
 }
 
 func importLicenses(w http.ResponseWriter, r *http.Request) {
+	deadline := time.Now().Add(20 * time.Second)
+
 	err := verifyToken(r, adminToken)
 	if err != nil {
 		sendError(w, err)
@@ -70,7 +73,8 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 
 	var outcomes []outcome
 	var added int
-	var skipped int
+	var existed int
+	var timedout int
 
 	imp, err := model.NewImporter(db)
 	if err != nil {
@@ -78,17 +82,23 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, license := range licenses {
-		isNew, err := imp.Import(license)
-		if err != nil {
-			sendError(w, err)
-			return
-		}
-		outcomes = append(outcomes, outcome{license, isNew})
-		if isNew {
-			added++
+		var result string
+		if time.Now().After(deadline) {
+			result = "timeout"
+			timedout++
 		} else {
-			skipped++
+			isNew, err := imp.Import(license)
+			if err != nil {
+				sendError(w, err)
+				return
+			}
+			if isNew {
+				result = "added"
+			} else {
+				result = "existed"
+			}
 		}
+		outcomes = append(outcomes, outcome{license, result})
 	}
 
 	err = imp.Commit()
@@ -100,13 +110,9 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 	// components := strings.Split(r.URL.Path, "/")
 
 	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "Added %d licenses, skipped %d.\n\n", added, skipped)
+	fmt.Fprintf(w, "Added %d licenses, existed %d, timed out %d.\n\n", added, existed, timedout)
 	for _, o := range outcomes {
-		if o.added {
-			fmt.Fprintf(w, "added   %s\n", o.license.Code)
-		} else {
-			fmt.Fprintf(w, "existed %s\n", o.license.Code)
-		}
+		fmt.Fprintf(w, "%-7s %s\n", o.result, o.license.Code)
 	}
 }
 
