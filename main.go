@@ -26,7 +26,7 @@ type outcome struct {
 }
 
 func importLicenses(w http.ResponseWriter, r *http.Request) {
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := time.Now().Add(15 * time.Second)
 
 	err := verifyToken(r, adminToken)
 	if err != nil {
@@ -75,6 +75,8 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 	var added int
 	var existed int
 	var timedout int
+	var count int
+	var last *licensecode.License
 
 	imp, err := model.NewImporter(db)
 	if err != nil {
@@ -86,6 +88,9 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 		if time.Now().After(deadline) {
 			result = "timeout"
 			timedout++
+		} else if count > 1000 {
+			result = "limit"
+			timedout++
 		} else {
 			isNew, err := imp.Import(license)
 			if err != nil {
@@ -94,11 +99,15 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 			}
 			if isNew {
 				result = "added"
+				added++
 			} else {
 				result = "existed"
+				existed++
 			}
+			last = license
 		}
 		outcomes = append(outcomes, outcome{license, result})
+		count++
 	}
 
 	err = imp.Commit()
@@ -111,6 +120,9 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintf(w, "Added %d licenses, existed %d, timed out %d.\n\n", added, existed, timedout)
+	if last != nil {
+		fmt.Fprintf(w, "Last license processed: %s.\n\n", last.Code)
+	}
 	for _, o := range outcomes {
 		fmt.Fprintf(w, "%-7s %s\n", o.result, o.license.Code)
 	}

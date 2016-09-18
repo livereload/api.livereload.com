@@ -21,7 +21,7 @@ func NewImporter(db *sql.DB) (*Importer, error) {
 }
 
 func (imp *Importer) Import(license *licensecode.License) (bool, error) {
-	_, err := imp.stmt.Query(license.Product, license.Version, license.Type, license.Code)
+	_, err := imp.stmt.Exec(license.Product, license.Version, license.Type, license.Code)
 	if err != nil {
 		if pgerr, ok := err.(*pq.Error); ok {
 			if pgerr.Code == errCodeUniqueViolation {
