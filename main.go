@@ -88,9 +88,6 @@ func importLicenses(w http.ResponseWriter, r *http.Request) {
 		if time.Now().After(deadline) {
 			result = "timeout"
 			timedout++
-		} else if count > 1000 {
-			result = "limit"
-			timedout++
 		} else {
 			isNew, err := imp.Import(license)
 			if err != nil {
