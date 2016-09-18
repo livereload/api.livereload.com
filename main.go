@@ -136,6 +136,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	db.SetMaxOpenConns(4)
 
 	// age := 21
 	// rows, err := db.Query("SELECT name FROM users WHERE age = $1", age)
