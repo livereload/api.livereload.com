@@ -4,6 +4,10 @@
 	"GodepVersion": "v74",
 	"Deps": [
 		{
+			"ImportPath": "github.com/keighl/postmark",
+			"Rev": "6c4d0bbaf1b8ece6fcd3f05789bee84047e9eca7"
+		},
+		{
 			"ImportPath": "github.com/lib/pq",
 			"Comment": "go1.0-cutoff-117-g50761b0",
 			"Rev": "50761b0867bd1d9d069276790bcd4a3bccf2324a"
@@ -21,6 +25,10 @@
 		{
 			"ImportPath": "github.com/olekukonko/tablewriter",
 			"Rev": "daf2955e742cf123959884fdff4685aa79b63135"
+		},
+		{
+			"ImportPath": "github.com/shopspring/decimal",
+			"Rev": "d6f52241f332c63811249bd79a522406bea1a7c9"
 		}
 	]
 }
