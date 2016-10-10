@@ -20,7 +20,7 @@ type outcome struct {
 func importLicenses(w http.ResponseWriter, r *http.Request) {
 	deadline := time.Now().Add(25 * time.Second)
 
-	err := verifyToken(r, adminToken)
+	err := verifyToken(r.Header.Get("X-Token"), adminToken)
 	if err != nil {
 		sendError(w, err)
 		return

@@ -10,8 +10,9 @@ type Claim struct {
 	Store string
 	Qty   int
 
-	Txn    string
-	Ticket string
+	Txn     string
+	Ticket  string
+	OrderID string
 
 	Company   string
 	FirstName string
@@ -48,16 +49,18 @@ func ClaimLicense(db *sql.DB, product, version, typ string, claim *Claim) (strin
             claim_message = $11, claim_notes = $12, claim_additional = $13,
             claim_raw = $14,
             claim_currency = $15, claim_price = $16, claim_sale_gross = $17, claim_sale_tax = $18, claim_processor_fee = $19, claim_earnings = $20,
-            claim_coupon = $21, claim_coupon_savings = $22
+            claim_coupon = $21, claim_coupon_savings = $22,
+            claim_order_id = $23
         WHERE
-            id = (SELECT id FROM licenses WHERE product_code = $23 AND product_version = $24 AND license_type = $25 AND NOT claimed LIMIT 1 FOR UPDATE) RETURNING license_code`,
+            id = (SELECT id FROM licenses WHERE product_code = $24 AND product_version = $25 AND license_type = $26 AND NOT claimed LIMIT 1 FOR UPDATE) RETURNING license_code`,
 		claim.Store, claim.Qty,
 		claim.Txn, claim.Ticket,
 		claim.Company, claim.FirstName, claim.LastName, claim.FullName, claim.Email, claim.Country,
 		claim.Message, claim.Notes, claim.Additional,
 		claim.Raw,
-		claim.Currency, claim.Price, claim.SaleGross, claim.SaleTax, claim.ProcessorFee, claim.Earnings,
-		claim.Coupon, claim.CouponSavings,
+		claim.Currency, claim.Price.String(), claim.SaleGross.String(), claim.SaleTax.String(), claim.ProcessorFee.String(), claim.Earnings.String(),
+		claim.Coupon, claim.CouponSavings.String(),
+		claim.OrderID,
 		product, version, typ,
 	).Scan(&licenseCode)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 )
 
 var adminToken string
+var paddleToken string
 var db *sql.DB
 
 func index(w http.ResponseWriter, r *http.Request) {
@@ -30,6 +31,11 @@ func main() {
 		log.Fatal("Missing required ADMIN_TOKEN.")
 	}
 
+	paddleToken = os.Getenv("PADDLE_TOKEN")
+	if paddleToken == "" {
+		log.Fatal("Missing required PADDLE_TOKEN.")
+	}
+
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
 		log.Fatal("Missing required DATABASE_URL.")
@@ -43,6 +49,7 @@ func main() {
 
 	http.HandleFunc("/licensing/admin/import/", importLicenses)
 	http.HandleFunc("/licensing/admin/stats/", showLicensingStats)
+	http.HandleFunc("/licensing/callback/paddle", claimLicenseForPaddle)
 	http.HandleFunc("/", index)
 	log.Printf("Listening on port %s.", port)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)

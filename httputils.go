@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"log"
+	"mime"
 	"net/http"
 )
 
@@ -43,13 +44,25 @@ func sendError(w http.ResponseWriter, err error) {
 	}
 }
 
-func verifyToken(r *http.Request, correctToken string) error {
-	token := r.Header.Get("X-Token")
+func parseRequestContentType(r *http.Request) (string, error) {
+	ctype := r.Header.Get("Content-Type")
+	if ctype == "" {
+		return "", nil
+	}
+
+	mediatype, _, err := mime.ParseMediaType(ctype)
+	if err != nil {
+		return "", newHTTPError(http.StatusBadRequest, "Failed to parse Content-Type: %v", err)
+	}
+	return mediatype, nil
+}
+
+func verifyToken(token string, correctToken string) error {
 	if token == "" {
-		return newHTTPError(http.StatusUnauthorized, "Missing auth token")
+		return newHTTPError(http.StatusUnauthorized, "Missing token")
 	}
 	if subtle.ConstantTimeCompare([]byte(token), []byte(correctToken)) != 1 {
-		return newHTTPError(http.StatusUnauthorized, "Invalid auth token")
+		return newHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
 	return nil
 }
