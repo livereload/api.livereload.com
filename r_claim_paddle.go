@@ -3,12 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
-	"unicode/utf8"
+	"strings"
 
 	"github.com/shopspring/decimal"
 
@@ -45,8 +43,6 @@ RAW
 `
 
 type paddleClaimRequest struct {
-	Token string `json:"token"`
-
 	Txn     string `json:"txn"`
 	Qty     string `json:"quantity"`
 	Name    string `json:"name"`
@@ -79,46 +75,44 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctype, _ := parseRequestContentType(r)
-	log.Printf("Content-Type: %v", ctype)
-	// if ctype != "application/json" {
-	// 	sendErrorMessage(w, http.StatusBadRequest, "application/json Content-Type required")
-	// 	return
-	// }
+	if ctype != "application/x-www-form-urlencoded" {
+		sendErrorFmt(w, http.StatusBadRequest, "application/x-www-form-urlencoded Content-Type required, got %v", ctype)
+		return
+	}
 
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024*1024))
+	err := r.ParseForm()
 	if err != nil {
-		sendErrorMessage(w, http.StatusBadRequest, "Failed to read the POST payload")
+		sendErrorMessage(w, http.StatusBadRequest, "Failed to parse the form payload")
 		return
 	}
-	if !utf8.Valid(body) {
-		sendErrorMessage(w, http.StatusBadRequest, "POST payload is not a valid UTF-8 string")
-		return
-	}
-	log.Printf("body: %v", string(body))
 
-	var raw map[string]interface{}
-	err = json.Unmarshal(body, &raw)
+	err = verifyToken(r.PostForm.Get("token"), paddleToken)
 	if err != nil {
-		sendErrorMessage(w, http.StatusInternalServerError, "Failed to unmarshal JSON")
+		sendError(w, err)
 		return
 	}
-	delete(raw, "token")
-	indented, err := json.MarshalIndent(raw, "", "  ")
+
+	raw := map[string]string{}
+	var pairs []string
+	for k, vv := range r.PostForm {
+		if k == "token" {
+			continue
+		}
+		for _, v := range vv {
+			raw[k] = v
+			pairs = append(pairs, fmt.Sprintf("%v = %v", k, v))
+		}
+	}
+	rawJSON, err := json.Marshal(raw)
 	if err != nil {
 		sendErrorMessage(w, http.StatusInternalServerError, "Failed to marshal JSON")
 		return
 	}
 
 	var rq paddleClaimRequest
-	err = json.Unmarshal(body, &rq)
+	err = json.Unmarshal(rawJSON, &rq)
 	if err != nil {
 		sendErrorFmt(w, http.StatusBadRequest, "Failed to decode POST payload as JSON: %v", err)
-		return
-	}
-
-	err = verifyToken(rq.Token, paddleToken)
-	if err != nil {
-		sendError(w, err)
 		return
 	}
 
@@ -146,7 +140,7 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 		Email:    rq.Email,
 		Message:  rq.Message,
 
-		Raw: string(indented),
+		Raw: string(rawJSON),
 
 		OrderID:  rq.OrderID,
 		Country:  rq.Country,
@@ -226,7 +220,7 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 		"COUPON_SAVINGS": claim.CouponSavings.StringFixed(4),
 
 		"UNCLAIMED": strconv.Itoa(unclaimed),
-		"RAW":       string(indented),
+		"RAW":       strings.Join(pairs, "\n"),
 	}
 	subject, text := applyEmailTemplate(messageTemplate, params)
 	if claim.Coupon != "" {
