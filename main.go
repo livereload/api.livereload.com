@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/keighl/postmark"
 	_ "github.com/lib/pq"
 )
 
 var adminToken string
 var paddleToken string
 var db *sql.DB
+var postmarkClient *postmark.Client
 
 func index(w http.ResponseWriter, r *http.Request) {
 	sendErrorMessage(w, http.StatusNotFound, "Nothing to see here, move along.")
@@ -46,6 +48,12 @@ func main() {
 		log.Fatal(err)
 	}
 	db.SetMaxOpenConns(4)
+
+	postmarkEmailAPIKey := os.Getenv("POSTMARK_API_KEY")
+	if postmarkEmailAPIKey == "" {
+		log.Fatal("Missing required POSTMARK_API_KEY.")
+	}
+	postmarkClient = postmark.NewClient(postmarkEmailAPIKey, "")
 
 	http.HandleFunc("/licensing/admin/import/", importLicenses)
 	http.HandleFunc("/licensing/admin/stats/", showLicensingStats)

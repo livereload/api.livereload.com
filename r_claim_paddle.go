@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"unicode/utf8"
 
 	"github.com/shopspring/decimal"
@@ -14,6 +15,34 @@ import (
 	"github.com/livereload/api.livereload.com/licensecode"
 	"github.com/livereload/api.livereload.com/model"
 )
+
+const messageTemplate = `Subject: License via STORE - PRICE CURRENCY
+
+NAME <EMAIL>
+LICENSE_CODE
+Store: STORE
+Price: PRICE
+Earnings: EARNINGS
+Gross: GROSS
+
+Unclaimed license codes: UNCLAIMED
+
+Order ID: ORDER_ID
+Transaction: TXN
+Country: COUNTRY
+Currency: CURRENCY
+Quantity: QUANTITY
+
+Tax: TAX
+Processor Fee: PROCESSOR_FEE
+
+Coupon: COUPON_TEXT
+Coupon Savings: COUPON_SAVINGS
+
+---
+
+RAW
+`
 
 type paddleClaimRequest struct {
 	Token string `json:"token"`
@@ -66,6 +95,19 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("body: %v", string(body))
 
+	var raw map[string]interface{}
+	err = json.Unmarshal(body, &raw)
+	if err != nil {
+		sendErrorMessage(w, http.StatusInternalServerError, "Failed to unmarshal JSON")
+		return
+	}
+	delete(raw, "token")
+	indented, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		sendErrorMessage(w, http.StatusInternalServerError, "Failed to marshal JSON")
+		return
+	}
+
 	var rq paddleClaimRequest
 	err = json.Unmarshal(body, &rq)
 	if err != nil {
@@ -103,7 +145,7 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 		Email:    rq.Email,
 		Message:  rq.Message,
 
-		Raw: string(body),
+		Raw: string(indented),
 
 		OrderID:  rq.OrderID,
 		Country:  rq.Country,
@@ -142,15 +184,63 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	product := "LR"
+	version := "2"
+	typ := licensecode.TypeIndividual
+
 	var code string
 	if false {
 		code = "LR2A-X92VM-MGI6H-KT5XM-KRD52-FIDXF-CQG3F-PUPE3"
 	} else {
-		code, err = model.ClaimLicense(db, "LR", "2", licensecode.TypeIndividual, claim)
+		code, err = model.ClaimLicense(db, product, version, typ, claim)
 		if err != nil {
 			sendError(w, err)
 			return
 		}
+	}
+
+	unclaimed, err := model.CountUnclaimedLicenses(db, product, version, typ)
+	if err != nil {
+		unclaimed = -1
+		log.Printf("ERROR: Failed to obtain the number of unclaimed licenses: %v", err)
+	}
+
+	params := map[string]string{
+		"STORE":         claim.Store,
+		"PRICE":         claim.Price.StringFixed(2),
+		"NAME":          claim.FullName,
+		"EMAIL":         claim.Email,
+		"LICENSE_CODE":  code,
+		"ORDER_ID":      claim.OrderID,
+		"TXN":           claim.Txn,
+		"EARNINGS":      claim.Earnings.StringFixed(4),
+		"GROSS":         claim.SaleGross.StringFixed(4),
+		"TAX":           claim.SaleTax.StringFixed(4),
+		"PROCESSOR_FEE": claim.ProcessorFee.StringFixed(4),
+		"COUNTRY":       claim.Country,
+		"CURRENCY":      claim.Currency,
+		"QUANTITY":      strconv.Itoa(claim.Qty),
+
+		"COUPON_TEXT":    claim.Coupon,
+		"COUPON_SAVINGS": claim.CouponSavings.StringFixed(4),
+
+		"UNCLAIMED": strconv.Itoa(unclaimed),
+		"RAW":       string(indented),
+	}
+	subject, text := applyEmailTemplate(messageTemplate, params)
+	if claim.Coupon != "" {
+		subject = fmt.Sprintf("%s (%s)", subject, claim.Coupon)
+	}
+
+	if false {
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(w, "Subject: %s\n\n%s", subject, text)
+		return
+	}
+
+	err = sendEmail("LiveReload Bot <bot@livereload.com>", "Andrey Tarantsov <andrey@tarantsov.com>", fmt.Sprintf("%s <%s>", claim.FullName, claim.Email), subject, text, "license-admin-nf", true)
+	if err != nil {
+		log.Printf("ERROR: Failed to send email: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
