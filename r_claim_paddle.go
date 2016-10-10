@@ -79,10 +79,11 @@ func claimLicenseForPaddle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctype, _ := parseRequestContentType(r)
-	if ctype != "application/json" {
-		sendErrorMessage(w, http.StatusBadRequest, "application/json Content-Type required")
-		return
-	}
+	log.Printf("Content-Type: %v", ctype)
+	// if ctype != "application/json" {
+	// 	sendErrorMessage(w, http.StatusBadRequest, "application/json Content-Type required")
+	// 	return
+	// }
 
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1024*1024))
 	if err != nil {
