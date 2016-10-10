@@ -58,6 +58,7 @@ func main() {
 	http.HandleFunc("/licensing/admin/import/", importLicenses)
 	http.HandleFunc("/licensing/admin/stats/", showLicensingStats)
 	http.HandleFunc("/licensing/callback/paddle", claimLicenseForPaddle)
+	http.HandleFunc("/licensing/callback/paddle/", claimLicenseForPaddle)
 	http.HandleFunc("/", index)
 	log.Printf("Listening on port %s.", port)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
