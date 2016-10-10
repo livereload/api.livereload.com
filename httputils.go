@@ -26,6 +26,7 @@ func sendErrorMessage(w http.ResponseWriter, code int, message string) {
 	if message == "" {
 		message = http.StatusText(code)
 	}
+	log.Printf("ERROR: HTTP %v - %v", code, message)
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(code)
 	w.Write([]byte(message))
